@@ -464,9 +464,19 @@ app.delete('/api/contact/:id', verifyAdminToken, async (req, res) => {
   }
 });
 
+// Root welcome route
+app.get('/', (req, res) => {
+  res.send('Hello from RGMS Backend!');
+});
+
+app.get('/api', (req, res) => {
+  res.json({ message: 'Hello from RGMS Backend!' });
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({
+    message: 'Hello from RGMS Backend!',
     status: 'ok',
     mongoDB: isMongoConnected ? 'connected' : 'offline_fallback',
     time: new Date().toISOString()
