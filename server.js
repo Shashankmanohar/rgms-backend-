@@ -269,7 +269,7 @@ app.get('/api/products/:id', async (req, res) => {
 
 // POST /api/products - Create Product (Protected by JWT)
 app.post('/api/products', verifyAdminToken, async (req, res) => {
-  const { name, category, price, oldPrice, badge, rating, reviews, image, stock, description, features } = req.body;
+  const { name, category, price, oldPrice, badge, rating, reviews, image, stock, description, features, isDeal, isNewArrival, isBestSeller } = req.body;
   if (!name || !price) {
     return res.status(400).json({ error: 'Product title and price are required.' });
   }
@@ -286,7 +286,10 @@ app.post('/api/products', verifyAdminToken, async (req, res) => {
     image: image || '/assets/asset-1.png',
     stock: stock !== undefined ? Number(stock) : 20,
     description: description || 'Official RGMS Smart Security Device with 6 Months Warranty.',
-    features: Array.isArray(features) ? features : (features ? [features] : ['Official RGMS Warranty', 'Free Express Shipping Across India'])
+    features: Array.isArray(features) ? features : (features ? [features] : ['Official RGMS Warranty', 'Free Express Shipping Across India']),
+    isDeal: isDeal !== undefined ? Boolean(isDeal) : false,
+    isNewArrival: isNewArrival !== undefined ? Boolean(isNewArrival) : true,
+    isBestSeller: isBestSeller !== undefined ? Boolean(isBestSeller) : false
   };
 
   try {
