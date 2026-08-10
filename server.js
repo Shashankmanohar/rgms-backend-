@@ -146,16 +146,20 @@ app.post('/api/admin/login', async (req, res) => {
     let adminObj = { username };
 
     if (isMongoConnected) {
-      const dbAdmin = await Admin.findOne({ username });
+      const dbAdmin = await Admin.findOne({
+        $or: [{ username: username }, { email: username }]
+      });
       if (dbAdmin) {
         isValid = await bcrypt.compare(password, dbAdmin.password);
+        adminObj.username = dbAdmin.username;
         adminObj.email = dbAdmin.email;
       }
     }
 
     // Default hardcoded admin fallback for quick testing
-    if (!isValid && username === 'admin' && (password === 'rgmsadmin' || password === 'rgmsadmin@gmail.com')) {
+    if (!isValid && (username === 'admin' || username === 'rgmsadmin@gmail.com') && (password === 'rgmsadmin' || password === 'rgmsadmin@gmail.com')) {
       isValid = true;
+      adminObj.username = 'admin';
       adminObj.email = 'rgmsadmin@gmail.com';
     }
 
