@@ -89,14 +89,17 @@ const seedDefaultData = async () => {
   if (!isMongoConnected) return;
   try {
     const adminCount = await Admin.countDocuments();
+    const hashedPassword = await bcrypt.hash('rgmsadmin', 10);
     if (adminCount === 0) {
-      const hashedPassword = await bcrypt.hash('admin123', 10);
       await Admin.create({
         username: 'admin',
         password: hashedPassword,
-        email: 'admin@rgms.in'
+        email: 'rgmsadmin@gmail.com'
       });
-      console.log('🔑 Default Admin created (Username: admin, Password: admin123)');
+      console.log('🔑 Default Admin created (Username: admin, Password: rgmsadmin)');
+    } else {
+      await Admin.updateOne({ username: 'admin' }, { password: hashedPassword, email: 'rgmsadmin@gmail.com' });
+      console.log('🔑 Default Admin password updated/reset to "rgmsadmin"');
     }
 
     const prodCount = await Product.countDocuments();
@@ -151,9 +154,9 @@ app.post('/api/admin/login', async (req, res) => {
     }
 
     // Default hardcoded admin fallback for quick testing
-    if (!isValid && username === 'admin' && password === 'admin123') {
+    if (!isValid && username === 'admin' && (password === 'rgmsadmin' || password === 'rgmsadmin@gmail.com')) {
       isValid = true;
-      adminObj.email = 'admin@rgms.in';
+      adminObj.email = 'rgmsadmin@gmail.com';
     }
 
     if (!isValid) {
@@ -270,15 +273,15 @@ app.get('/api/products/:id', async (req, res) => {
 // POST /api/products - Create Product (Protected by JWT)
 app.post('/api/products', verifyAdminToken, async (req, res) => {
   const { name, category, price, oldPrice, badge, rating, reviews, image, stock, description, features, isDeal, isNewArrival, isBestSeller } = req.body;
-  if (!name || !price) {
-    return res.status(400).json({ error: 'Product title and price are required.' });
+  if (!name) {
+    return res.status(400).json({ error: 'Product title is required.' });
   }
 
   const newProduct = {
     id: `prod-${Date.now()}`,
     name,
     category: category || 'wifi-cameras',
-    price: Number(price),
+    price: price !== undefined && price !== null && price !== '' ? Number(price) : null,
     oldPrice: oldPrice ? Number(oldPrice) : null,
     badge: badge || 'NEW',
     rating: Number(rating) || 5.0,

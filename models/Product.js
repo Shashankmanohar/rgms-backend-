@@ -4,7 +4,7 @@ const productSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
   name: { type: String, required: true },
   category: { type: String, default: 'wifi-cameras' },
-  price: { type: Number, required: true },
+  price: { type: Number, default: null },
   oldPrice: { type: Number, default: null },
   badge: { type: String, default: 'NEW' },
   rating: { type: Number, default: 5.0 },
