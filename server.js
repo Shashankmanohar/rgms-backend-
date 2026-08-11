@@ -16,8 +16,6 @@ const ContactMessage = require('./models/ContactMessage');
 const app = express();
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'rgms_super_secret_jwt_key_2026';
-const DATA_FILE = path.join(__dirname, 'data', 'products.json');
-const MESSAGES_FILE = path.join(__dirname, 'data', 'messages.json');
 
 // Middleware
 app.use(cors({
@@ -76,26 +74,20 @@ const connectDB = () => {
 };
 connectDB();
 
-// File Database Fallback Helpers
-const readProductsFromFile = () => {
-  try {
-    if (!fs.existsSync(DATA_FILE)) return [];
-    const raw = fs.readFileSync(DATA_FILE, 'utf8');
-    return JSON.parse(raw || '[]');
-  } catch (e) {
-    return [];
+// Database Connection Enforcement Middleware
+const requireMongoDB = (req, res, next) => {
+  if (req.path === '/health') {
+    return next();
   }
-};
-
-const writeProductsToFile = (products) => {
-  try {
-    const dir = path.dirname(DATA_FILE);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(DATA_FILE, JSON.stringify(products, null, 2), 'utf8');
-  } catch (e) {
-    console.error('File write error:', e);
+  if (!isMongoConnected) {
+    return res.status(503).json({
+      error: 'Database connection is offline. Please make sure MONGODB_URI is correctly configured and the database is accessible.',
+      details: mongoError
+    });
   }
+  next();
 };
+app.use('/api', requireMongoDB);
 
 // Seed default Admin & cleanup default products in MongoDB
 const seedDefaultData = async () => {
@@ -156,15 +148,13 @@ app.post('/api/admin/login', async (req, res) => {
     let isValid = false;
     let adminObj = { username };
 
-    if (isMongoConnected) {
-      const dbAdmin = await Admin.findOne({
-        $or: [{ username: username }, { email: username }]
-      });
-      if (dbAdmin) {
-        isValid = await bcrypt.compare(password, dbAdmin.password);
-        adminObj.username = dbAdmin.username;
-        adminObj.email = dbAdmin.email;
-      }
+    const dbAdmin = await Admin.findOne({
+      $or: [{ username: username }, { email: username }]
+    });
+    if (dbAdmin) {
+      isValid = await bcrypt.compare(password, dbAdmin.password);
+      adminObj.username = dbAdmin.username;
+      adminObj.email = dbAdmin.email;
     }
 
     // Default hardcoded admin fallback for quick testing
@@ -247,18 +237,8 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
 app.get('/api/products', async (req, res) => {
   try {
     const category = req.query.category;
-    let products = [];
-
-    if (isMongoConnected) {
-      const filter = category && category !== 'all' ? { category } : {};
-      products = await Product.find(filter).sort({ createdAt: -1 });
-    } else {
-      products = readProductsFromFile();
-      if (category && category !== 'all') {
-        products = products.filter(p => p.category === category);
-      }
-    }
-
+    const filter = category && category !== 'all' ? { category } : {};
+    const products = await Product.find(filter).sort({ createdAt: -1 });
     res.json(products);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch products: ' + err.message });
@@ -268,14 +248,7 @@ app.get('/api/products', async (req, res) => {
 // GET /api/products/:id - Fetch Single Product
 app.get('/api/products/:id', async (req, res) => {
   try {
-    let product = null;
-    if (isMongoConnected) {
-      product = await Product.findOne({ id: req.params.id });
-    } else {
-      const products = readProductsFromFile();
-      product = products.find(p => p.id === req.params.id);
-    }
-
+    const product = await Product.findOne({ id: req.params.id });
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
     }
@@ -311,16 +284,8 @@ app.post('/api/products', verifyAdminToken, async (req, res) => {
   };
 
   try {
-    if (isMongoConnected) {
-      await Product.create(newProduct);
-    }
-    
-    // Always sync local JSON file database as well
-    const fileProds = readProductsFromFile();
-    fileProds.unshift(newProduct);
-    writeProductsToFile(fileProds);
-
-    res.status(201).json({ message: 'Product added successfully to inventory', product: newProduct });
+    const createdProduct = await Product.create(newProduct);
+    res.status(201).json({ message: 'Product added successfully to inventory', product: createdProduct });
   } catch (err) {
     res.status(500).json({ error: 'Failed to save product: ' + err.message });
   }
@@ -331,24 +296,11 @@ app.put('/api/products/:id', verifyAdminToken, async (req, res) => {
   const { id } = req.params;
 
   try {
-    let updatedProduct = null;
-
-    if (isMongoConnected) {
-      updatedProduct = await Product.findOneAndUpdate(
-        { id },
-        { $set: req.body },
-        { new: true }
-      );
-    }
-
-    // Sync local JSON file
-    const fileProds = readProductsFromFile();
-    const idx = fileProds.findIndex(p => p.id === id);
-    if (idx !== -1) {
-      fileProds[idx] = { ...fileProds[idx], ...req.body };
-      writeProductsToFile(fileProds);
-      if (!updatedProduct) updatedProduct = fileProds[idx];
-    }
+    const updatedProduct = await Product.findOneAndUpdate(
+      { id },
+      { $set: req.body },
+      { new: true }
+    );
 
     if (!updatedProduct) {
       return res.status(404).json({ error: 'Product not found' });
@@ -363,10 +315,7 @@ app.put('/api/products/:id', verifyAdminToken, async (req, res) => {
 // DELETE /api/products/all - Clear All Products (Protected by JWT)
 app.delete('/api/products/all', verifyAdminToken, async (req, res) => {
   try {
-    if (isMongoConnected) {
-      await Product.deleteMany({});
-    }
-    writeProductsToFile([]);
+    await Product.deleteMany({});
     res.json({ message: 'All products deleted successfully from inventory' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to clear products: ' + err.message });
@@ -378,14 +327,10 @@ app.delete('/api/products/:id', verifyAdminToken, async (req, res) => {
   const { id } = req.params;
 
   try {
-    if (isMongoConnected) {
-      await Product.deleteOne({ id });
+    const deleteResult = await Product.deleteOne({ id });
+    if (deleteResult.deletedCount === 0) {
+      return res.status(404).json({ error: 'Product not found' });
     }
-
-    let fileProds = readProductsFromFile();
-    fileProds = fileProds.filter(p => p.id !== id);
-    writeProductsToFile(fileProds);
-
     res.json({ message: 'Product deleted successfully', id });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete product: ' + err.message });
@@ -393,26 +338,6 @@ app.delete('/api/products/:id', verifyAdminToken, async (req, res) => {
 });
 
 // ================= CONTACT MESSAGES API ROUTES ================= //
-
-const readMessagesFromFile = () => {
-  try {
-    if (!fs.existsSync(MESSAGES_FILE)) return [];
-    const raw = fs.readFileSync(MESSAGES_FILE, 'utf8');
-    return JSON.parse(raw || '[]');
-  } catch (e) {
-    return [];
-  }
-};
-
-const writeMessagesToFile = (msgs) => {
-  try {
-    const dir = path.dirname(MESSAGES_FILE);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(MESSAGES_FILE, JSON.stringify(msgs, null, 2), 'utf8');
-  } catch (e) {
-    console.error('Messages write error:', e);
-  }
-};
 
 // POST /api/contact - Public submission from Contact Page
 app.post('/api/contact', async (req, res) => {
@@ -433,14 +358,8 @@ app.post('/api/contact', async (req, res) => {
   };
 
   try {
-    if (isMongoConnected) {
-      await ContactMessage.create(newMessage);
-    }
-    const msgs = readMessagesFromFile();
-    msgs.unshift(newMessage);
-    writeMessagesToFile(msgs);
-
-    res.status(201).json({ message: 'Contact message received successfully', contact: newMessage });
+    const createdMsg = await ContactMessage.create(newMessage);
+    res.status(201).json({ message: 'Contact message received successfully', contact: createdMsg });
   } catch (err) {
     res.status(500).json({ error: 'Failed to save contact message: ' + err.message });
   }
@@ -449,12 +368,7 @@ app.post('/api/contact', async (req, res) => {
 // GET /api/contact - Fetch All Contact Messages for Admin (Protected by JWT)
 app.get('/api/contact', verifyAdminToken, async (req, res) => {
   try {
-    let msgs = [];
-    if (isMongoConnected) {
-      msgs = await ContactMessage.find().sort({ createdAt: -1 });
-    } else {
-      msgs = readMessagesFromFile();
-    }
+    const msgs = await ContactMessage.find().sort({ createdAt: -1 });
     res.json(msgs);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch contact messages: ' + err.message });
@@ -465,14 +379,9 @@ app.get('/api/contact', verifyAdminToken, async (req, res) => {
 app.put('/api/contact/:id/read', verifyAdminToken, async (req, res) => {
   const { id } = req.params;
   try {
-    if (isMongoConnected) {
-      await ContactMessage.findOneAndUpdate({ id }, { $set: { status: 'read' } });
-    }
-    const msgs = readMessagesFromFile();
-    const idx = msgs.findIndex(m => m.id === id);
-    if (idx !== -1) {
-      msgs[idx].status = 'read';
-      writeMessagesToFile(msgs);
+    const updatedMsg = await ContactMessage.findOneAndUpdate({ id }, { $set: { status: 'read' } }, { new: true });
+    if (!updatedMsg) {
+      return res.status(404).json({ error: 'Message not found' });
     }
     res.json({ message: 'Message marked as read', id });
   } catch (err) {
@@ -484,12 +393,10 @@ app.put('/api/contact/:id/read', verifyAdminToken, async (req, res) => {
 app.delete('/api/contact/:id', verifyAdminToken, async (req, res) => {
   const { id } = req.params;
   try {
-    if (isMongoConnected) {
-      await ContactMessage.deleteOne({ id });
+    const deleteResult = await ContactMessage.deleteOne({ id });
+    if (deleteResult.deletedCount === 0) {
+      return res.status(404).json({ error: 'Message not found' });
     }
-    let msgs = readMessagesFromFile();
-    msgs = msgs.filter(m => m.id !== id);
-    writeMessagesToFile(msgs);
     res.json({ message: 'Message deleted successfully', id });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete message: ' + err.message });
