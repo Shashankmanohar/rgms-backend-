@@ -86,7 +86,7 @@ const writeProductsToFile = (products) => {
   }
 };
 
-// Seed default Admin & Products in MongoDB if empty
+// Seed default Admin & cleanup default products in MongoDB
 const seedDefaultData = async () => {
   if (!isMongoConnected) return;
   try {
@@ -104,16 +104,14 @@ const seedDefaultData = async () => {
       console.log('🔑 Default Admin password updated/reset to "rgmsadmin"');
     }
 
-    const prodCount = await Product.countDocuments();
-    if (prodCount === 0) {
-      const fileProds = readProductsFromFile();
-      if (fileProds.length > 0) {
-        await Product.insertMany(fileProds);
-        console.log(`📦 Seeded ${fileProds.length} default products into MongoDB.`);
-      }
+    // Delete default products from MongoDB if present
+    const defaultIds = ["prod-1786178881952", "prod-1786088544194", "prod-1786088030889", "prod-1786087967465"];
+    const deleteResult = await Product.deleteMany({ id: { $in: defaultIds } });
+    if (deleteResult.deletedCount > 0) {
+      console.log(`🧹 Deleted ${deleteResult.deletedCount} default products from MongoDB.`);
     }
   } catch (e) {
-    console.error('Seeding error:', e.message);
+    console.error('Seeding/cleanup error:', e.message);
   }
 };
 
