@@ -54,7 +54,10 @@ let mongoError = null;
 // Connect to MongoDB
 const connectDB = async () => {
   try {
-    const connStr = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/rgms_db';
+    const connStr = process.env.MONGODB_URI;
+    if (!connStr) {
+      throw new Error('MONGODB_URI environment variable is missing/undefined in your Vercel project settings!');
+    }
     await mongoose.connect(connStr, { serverSelectionTimeoutMS: 3000 });
     isMongoConnected = true;
     mongoError = null;
