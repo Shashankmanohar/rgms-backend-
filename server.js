@@ -49,6 +49,7 @@ cloudinary.config({
 
 // Database Connection Flag
 let isMongoConnected = false;
+let mongoError = null;
 
 // Connect to MongoDB
 const connectDB = async () => {
@@ -56,10 +57,12 @@ const connectDB = async () => {
     const connStr = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/rgms_db';
     await mongoose.connect(connStr, { serverSelectionTimeoutMS: 3000 });
     isMongoConnected = true;
+    mongoError = null;
     console.log(`✅ MongoDB Connected Successfully: ${mongoose.connection.host}`);
     await seedDefaultData();
   } catch (err) {
     isMongoConnected = false;
+    mongoError = err.message;
     console.log(`⚠️ MongoDB Not Available (${err.message}). Using local JSON database file.`);
   }
 };
@@ -500,6 +503,7 @@ app.get('/api/health', (req, res) => {
     message: 'Hello from RGMS Backend!',
     status: 'ok',
     mongoDB: isMongoConnected ? 'connected' : 'offline_fallback',
+    mongoError: mongoError,
     time: new Date().toISOString()
   });
 });
