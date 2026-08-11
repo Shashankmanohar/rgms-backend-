@@ -75,9 +75,16 @@ const connectDB = () => {
 connectDB();
 
 // Database Connection Enforcement Middleware
-const requireMongoDB = (req, res, next) => {
+const requireMongoDB = async (req, res, next) => {
   if (req.path === '/health') {
     return next();
+  }
+  if (dbConnectionPromise) {
+    try {
+      await dbConnectionPromise;
+    } catch (e) {
+      // ignore connection error here, it is handled below
+    }
   }
   if (!isMongoConnected) {
     return res.status(503).json({
