@@ -24,6 +24,8 @@ app.use(cors({
   origin: [
     'https://rgms-frontend-9s7u.vercel.app',
     'https://rgms-backend.vercel.app',
+    'https://www.rgmservices.in',
+    'https://rgmservices.in',
     'http://localhost:3000',
     'http://localhost:3001',
   ],
