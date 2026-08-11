@@ -50,24 +50,29 @@ cloudinary.config({
 // Database Connection Flag
 let isMongoConnected = false;
 let mongoError = null;
+let dbConnectionPromise = null;
 
 // Connect to MongoDB
-const connectDB = async () => {
-  try {
-    const connStr = process.env.MONGODB_URI;
-    if (!connStr) {
-      throw new Error('MONGODB_URI environment variable is missing/undefined in your Vercel project settings!');
-    }
-    await mongoose.connect(connStr, { serverSelectionTimeoutMS: 3000 });
-    isMongoConnected = true;
-    mongoError = null;
-    console.log(`✅ MongoDB Connected Successfully: ${mongoose.connection.host}`);
-    await seedDefaultData();
-  } catch (err) {
+const connectDB = () => {
+  const connStr = process.env.MONGODB_URI;
+  if (!connStr) {
     isMongoConnected = false;
-    mongoError = err.message;
-    console.log(`⚠️ MongoDB Not Available (${err.message}). Using local JSON database file.`);
+    mongoError = 'MONGODB_URI environment variable is missing/undefined in your Vercel project settings!';
+    dbConnectionPromise = Promise.reject(new Error(mongoError));
+    return;
   }
+  dbConnectionPromise = mongoose.connect(connStr, { serverSelectionTimeoutMS: 3000 })
+    .then(async () => {
+      isMongoConnected = true;
+      mongoError = null;
+      console.log(`✅ MongoDB Connected Successfully: ${mongoose.connection.host}`);
+      await seedDefaultData();
+    })
+    .catch((err) => {
+      isMongoConnected = false;
+      mongoError = err.message;
+      console.log(`⚠️ MongoDB Not Available (${err.message}). Using local JSON database file.`);
+    });
 };
 connectDB();
 
@@ -501,7 +506,14 @@ app.get('/api', (req, res) => {
 });
 
 // Health check
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
+  if (dbConnectionPromise) {
+    try {
+      await dbConnectionPromise;
+    } catch (e) {
+      // ignore rejection, it is handled in catch block
+    }
+  }
   res.json({
     message: 'Hello from RGMS Backend!',
     status: 'ok',
