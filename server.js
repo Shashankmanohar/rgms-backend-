@@ -52,25 +52,36 @@ let dbConnectionPromise = null;
 
 // Connect to MongoDB
 const connectDB = () => {
-  const connStr = process.env.MONGODB_URI;
+  const FALLBACK_MONGODB_URI = 'mongodb+srv://shashankmanohar1734_db_user:rynkUKkMXNEP1oRP@rgms-2.gm3a3hn.mongodb.net/rgms_db?retryWrites=true&w=majority';
+  let connStr = process.env.MONGODB_URI;
+
+  const tryConnect = (uri, isFallback = false) => {
+    return mongoose.connect(uri, { serverSelectionTimeoutMS: 3000 })
+      .then(async () => {
+        isMongoConnected = true;
+        mongoError = null;
+        console.log(`✅ MongoDB Connected Successfully: ${mongoose.connection.host}`);
+        await seedDefaultData();
+      })
+      .catch((err) => {
+        if (!isFallback && uri !== FALLBACK_MONGODB_URI) {
+          console.log(`⚠️ MongoDB connection failed (${err.message}). Retrying with fallback connection string...`);
+          dbConnectionPromise = tryConnect(FALLBACK_MONGODB_URI, true);
+          return dbConnectionPromise;
+        } else {
+          isMongoConnected = false;
+          mongoError = err.message;
+          console.log(`⚠️ MongoDB Connection Failed: ${err.message}`);
+        }
+      });
+  };
+
   if (!connStr) {
-    isMongoConnected = false;
-    mongoError = 'MONGODB_URI environment variable is missing/undefined in your Vercel project settings!';
-    dbConnectionPromise = Promise.reject(new Error(mongoError));
-    return;
+    console.log('⚠️ MONGODB_URI env var is missing. Using fallback connection string.');
+    connStr = FALLBACK_MONGODB_URI;
   }
-  dbConnectionPromise = mongoose.connect(connStr, { serverSelectionTimeoutMS: 3000 })
-    .then(async () => {
-      isMongoConnected = true;
-      mongoError = null;
-      console.log(`✅ MongoDB Connected Successfully: ${mongoose.connection.host}`);
-      await seedDefaultData();
-    })
-    .catch((err) => {
-      isMongoConnected = false;
-      mongoError = err.message;
-      console.log(`⚠️ MongoDB Not Available (${err.message}). Using local JSON database file.`);
-    });
+
+  dbConnectionPromise = tryConnect(connStr, connStr === FALLBACK_MONGODB_URI);
 };
 connectDB();
 
