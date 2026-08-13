@@ -294,8 +294,8 @@ app.post('/api/products', verifyAdminToken, async (req, res) => {
     reviews: Number(reviews) || 0,
     image: image || '/assets/asset-1.png',
     stock: stock !== undefined ? Number(stock) : 20,
-    description: description || 'Official RGMS Smart Security Device with 6 Months Warranty.',
-    features: Array.isArray(features) ? features : (features ? [features] : ['Official RGMS Warranty', 'Free Express Shipping Across India']),
+    description: description || 'Official RGMS Smart Security Device.',
+    features: Array.isArray(features) ? features : (features ? [features] : ['Dedicated Tech Support']),
     isDeal: isDeal !== undefined ? Boolean(isDeal) : false,
     isNewArrival: isNewArrival !== undefined ? Boolean(isNewArrival) : true,
     isBestSeller: isBestSeller !== undefined ? Boolean(isBestSeller) : false

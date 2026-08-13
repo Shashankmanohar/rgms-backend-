@@ -11,7 +11,7 @@ const productSchema = new mongoose.Schema({
   reviews: { type: Number, default: 0 },
   image: { type: String, default: '/assets/asset-1.png' },
   stock: { type: Number, default: 20 },
-  description: { type: String, default: 'Official RGMS Smart Security Device with 6 Months Warranty.' },
+  description: { type: String, default: 'Official RGMS Smart Security Device.' },
   features: [{ type: String }],
   isDeal: { type: Boolean, default: false },
   isNewArrival: { type: Boolean, default: true },
