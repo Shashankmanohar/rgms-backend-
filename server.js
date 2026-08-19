@@ -56,7 +56,7 @@ const connectDB = () => {
   let connStr = process.env.MONGODB_URI;
 
   const tryConnect = (uri, isFallback = false) => {
-    return mongoose.connect(uri, { serverSelectionTimeoutMS: 3000 })
+    return mongoose.connect(uri, { dbName: 'rgms_db', serverSelectionTimeoutMS: 3000 })
       .then(async () => {
         isMongoConnected = true;
         mongoError = null;

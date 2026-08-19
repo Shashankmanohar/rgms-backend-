@@ -5,7 +5,7 @@ const Product = require('./models/Product');
 const updateDB = async () => {
   try {
     const connStr = process.env.MONGODB_URI;
-    await mongoose.connect(connStr);
+    await mongoose.connect(connStr, { dbName: 'rgms_db' });
     console.log('Connected to MongoDB');
 
     // Update Solar 4G Camera Pro
