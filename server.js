@@ -52,7 +52,7 @@ let dbConnectionPromise = null;
 
 // Connect to MongoDB
 const connectDB = () => {
-  const FALLBACK_MONGODB_URI = 'mongodb+srv://shashankmanohar1734_db_user:rynkUKkMXNEP1oRP@rgms-2.gm3a3hn.mongodb.net/rgms_db?retryWrites=true&w=majority';
+  const FALLBACK_MONGODB_URI = 'mongodb+srv://shashankmanohar1734_db_user:Shashankjee123@rgms-2.gm3a3hn.mongodb.net/rgms_db?retryWrites=true&w=majority&appName=RGMS-2';
   let connStr = process.env.MONGODB_URI;
 
   const tryConnect = (uri, isFallback = false) => {
